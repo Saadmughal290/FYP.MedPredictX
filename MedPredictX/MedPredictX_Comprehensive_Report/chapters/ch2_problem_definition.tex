@@ -1,0 +1,64 @@
+\chapter{PROBLEM DEFINITION}
+
+\section{The Core Challenge}
+
+Traditional telemedicine platforms focus primarily on video conferencing and appointment scheduling, fundamentally lacking intelligent preliminary diagnostic capabilities. This creates a structural gap in the patient care pathway: a patient who notices a new or alarming set of symptoms has no reliable digital tool to help them understand the severity of those symptoms or which type of specialist would be most appropriate to consult. As a result, the following critical failure points emerge in the existing healthcare pipeline:
+
+\begin{itemize}
+    \item \textbf{Misdirected Appointments:} Patients who cannot identify the correct specialist are forced to consult a General Practitioner first, who then issues a referral. This adds unnecessary cost, administrative overhead, and weeks of delay to the care process.
+
+    \item \textbf{Report Interpretation Gap:} A patient may possess a physical or digital PDF laboratory report (e.g., blood panels, radiology reports), but lack the medical vocabulary to understand its clinical implications. Existing telemedicine tools offer no mechanism to parse or interpret these documents for preliminary guidance.
+
+    \item \textbf{Inaccurate Online Self-Diagnosis:} In the absence of an intelligent tool, patients resort to general-purpose search engines. This frequently leads to ``cyberchondria,'' a well-documented psychological phenomenon where users self-diagnose severe conditions from benign symptom descriptions, driven by the inherent negativity bias in search engine result rankings.
+
+    \item \textbf{Geo-Location Barrier:} Even when a patient correctly identifies a required specialty, they frequently lack the practical knowledge or the tooling to locate a nearby, accessible specialist in a timely manner.
+\end{itemize}
+
+Figure~\ref{fig:problem_flow} illustrates the current broken patient triage flow and the pain points MedPredictX is designed to resolve.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+  \node[block, fill=red!15] (symptoms) {Patient Develops\\Symptoms};
+  \node[block, fill=red!15, below of=symptoms] (confused) {Confused About\\Specialist Type};
+  \node[block, fill=red!15, below of=confused] (gp) {Books GP\\Appointment};
+  \node[block, fill=red!15, below of=gp] (referral) {GP Issues\\Referral};
+  \node[block, fill=red!15, below of=referral] (wait) {Weeks of Wait\\Time for Specialist};
+  \node[block, fill=red!15, below of=wait] (specialist) {Finally Sees\\Specialist};
+
+  \draw[arrow] (symptoms) -- (confused);
+  \draw[arrow] (confused) -- (gp);
+  \draw[arrow] (gp) -- (referral);
+  \draw[arrow] (referral) -- (wait);
+  \draw[arrow] (wait) -- (specialist);
+
+  \node[right=0.5cm of confused, fill=yellow!20, draw=orange, rounded corners, text width=3.5cm, align=center, font=\footnotesize] {Pain Point: No intelligent routing};
+  \node[right=0.5cm of gp, fill=yellow!20, draw=orange, rounded corners, text width=3.5cm, align=center, font=\footnotesize] {Pain Point: Unnecessary consultation};
+  \node[right=0.5cm of wait, fill=yellow!20, draw=orange, rounded corners, text width=3.5cm, align=center, font=\footnotesize] {Pain Point: Delayed care};
+\end{tikzpicture}
+\caption{Current patient triage flow showing key pain points}
+\label{fig:problem_flow}
+\end{figure}
+
+\section{Proposed Solution}
+
+MedPredictX directly and systematically resolves each of the identified pain points through a unified, intelligent digital platform. The system is designed around a dual-AI engine approach:
+
+\begin{enumerate}
+    \item \textbf{Local Random Forest Predictor:} A machine learning classifier trained on 4,920 labelled patient symptom records covering 132 distinct features. The model predicts the most likely disease condition from a curated set of 41 possible diagnoses with high accuracy, operating entirely on the local server to guarantee data privacy and sub-50ms inference latency.
+
+    \item \textbf{Groq LLM Specialist Recommender:} A Natural Language Processing pipeline powered by the \texttt{llama-3.3-70b-versatile} model served via the Groq API. This module accepts either free-text symptom descriptions or machine-extracted text from uploaded PDF medical reports. It outputs a structured JSON recommendation including the relevant medical specialty, urgency level, key reasoning, and a dynamically generated Google Maps URI for geo-locating the nearest specialist.
+\end{enumerate}
+
+Both AI modules are surfaced through a consolidated \textbf{Medical Triage Hub}---a single React page with a tabbed interface that eliminates navigational friction and presents a cohesive, professional clinical experience to the end user.
+
+\section{Feasibility Analysis}
+
+\subsection{Technical Feasibility}
+The system leverages a well-established, mature technology stack: Python/Django for backend, React/Vite for frontend, scikit-learn for ML, and the Groq API for LLM inference. All dependencies are open-source and freely available. The training dataset (\texttt{Training.csv}) is a well-documented public dataset with 4,920 labelled records. Scikit-learn's Random Forest implementation provides a robust, interpretable classifier suitable for the symptom-based multi-class classification task.
+
+\subsection{Economic Feasibility}
+All core technologies used are either open-source or available under free-tier usage plans. The Groq API provides a free tier with generous rate limits suitable for demonstration and moderate clinical use. Deployment can be achieved on commodity cloud infrastructure.
+
+\subsection{Operational Feasibility}
+The system is designed with a clean, accessible user interface (UI) following modern UX conventions. No specialized technical knowledge is required for patients to interact with the triage tools.

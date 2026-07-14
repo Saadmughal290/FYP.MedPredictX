@@ -1,0 +1,90 @@
+\documentclass[12pt,a4paper]{report}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+\usepackage{tocloft}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+
+% Code listing style
+\lstset{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{gray!10},
+  frame=single,
+  rulecolor=\color{gray!40},
+  keywordstyle=\color{blue}\bfseries,
+  stringstyle=\color{orange},
+  commentstyle=\color{green!50!black}\itshape,
+  breaklines=true,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+}
+
+% TikZ arrow styles
+\tikzstyle{block} = [rectangle, rounded corners=4pt, minimum width=2.8cm, minimum height=1cm, text centered, draw=black!70, fill=blue!10, font=\small]
+\tikzstyle{db}    = [cylinder, shape border rotate=90, aspect=0.3, minimum width=2.2cm, minimum height=1cm, text centered, draw=black!70, fill=green!10, font=\small]
+\tikzstyle{cloud} = [rectangle, rounded corners=10pt, minimum width=2.8cm, minimum height=1cm, text centered, draw=black!70, fill=orange!15, font=\small]
+\tikzstyle{arrow} = [thick,->,>=Stealth]
+\tikzstyle{dasharrow} = [thick,dashed,->,>=Stealth]
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{MedPredictX}
+\lhead{\leftmark}
+\cfoot{\thepage}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+    {\Huge \textbf{MedPredictX}}\\[0.5cm]
+    {\LARGE AI-Powered Healthcare Triage System}\\[1.5cm]
+    {\Large \textbf{Software Requirements \& Design Specification}}\\[0.5cm]
+    {\large A Comprehensive Technical Report}\\[2.5cm]
+    \rule{0.6\textwidth}{0.4pt}\\[0.4cm]
+    {\Large \textbf{Submitted By}}\\[0.3cm]
+    {\large Your Name Here}\\[0.5cm]
+    {\large Your University / Department}\\[0.3cm]
+    \rule{0.6\textwidth}{0.4pt}\\[1cm]
+    {\large \today}
+    \vfill
+\end{titlepage}
+
+\begin{abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+The rapid advancement of artificial intelligence and machine learning has opened new paradigms in the healthcare sector, particularly in the domain of automated medical triage and preliminary diagnosis. This paper presents \textbf{MedPredictX}, a comprehensive, full-stack healthcare application designed to seamlessly bridge the gap between patients and medical professionals. MedPredictX integrates a robust Django-based backend architecture with a modern React frontend, supplemented by state-of-the-art AI capabilities.
+
+The system employs a dual-AI engine approach: a local \textbf{Random Forest Classifier} trained on 132 distinct symptom features for privacy-preserving, low-latency disease prediction, and the \textbf{Groq LLM API} (using the \texttt{llama-3.3-70b-versatile} model) for intelligent specialist recommendation based on natural language symptom descriptions or extracted PDF medical report content.
+
+Key features include a \textbf{Unified Medical Triage Hub} that consolidates both AI tools into a single tabbed page, a two-column card interface for flexible input (manual symptom entry or PDF upload), dynamic Google Maps specialist geo-location, role-based access control for Patients, Doctors, and Administrators, and JWT-secured REST APIs. The platform provides instantaneous, reliable diagnostic insights while maintaining clear clinical disclaimers that position MedPredictX as an informational aid, not a substitute for professional medical advice.
+\end{abstract}
+
+\tableofcontents
+\listoffigures
+\newpage
+
+\input{chapters/ch1_introduction}
+\input{chapters/ch2_problem_definition}
+\input{chapters/ch3_literature_review}
+\input{chapters/ch4_srs}
+\input{chapters/ch5_design}
+\input{chapters/ch6_implementation}
+\input{chapters/ch7_results}
+\input{chapters/ch8_conclusion}
+\input{chapters/ch9_references}
+
+\appendix
+\input{chapters/app_a_boxline}
+\input{chapters/app_b_design_models}
+
+\end{document}

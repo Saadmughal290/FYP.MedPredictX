@@ -1,0 +1,113 @@
+\chapter{Appendix A: System Architecture Diagrams}
+\addcontentsline{toc}{chapter}{Appendix A: System Architecture Diagrams}
+
+\section{Box-and-Line Architecture Diagram}
+
+Figure~\ref{fig:boxline} provides a high-level box-and-line representation of the complete MedPredictX system, showing the major components and their communication channels.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.5cm and 2.5cm, every node/.style={font=\small}]
+  % Client
+  \node[block, fill=blue!15, minimum width=3.8cm, minimum height=1.2cm] (client) {Client Browser};
+
+  % Frontend box
+  \node[block, fill=blue!8, minimum width=3.8cm, minimum height=1.2cm, below=1.5cm of client] (spa) {React SPA (Vite)\\Port 3000};
+
+  % Backend box
+  \node[block, fill=green!15, minimum width=3.8cm, minimum height=1.2cm, below=1.5cm of spa] (backend) {Django REST Framework\\Port 8000};
+
+  % Internal services
+  \node[block, fill=orange!15, minimum width=3cm, minimum height=1cm, left=2cm of backend] (rf) {Random Forest\\Classifier (joblib)};
+  \node[block, fill=orange!15, minimum width=3cm, minimum height=1cm, right=2cm of backend] (pdf) {PDF Extractor\\(PyPDF2)};
+
+  % Database
+  \node[db, fill=gray!15, minimum width=3cm, minimum height=1cm, below=1.5cm of backend] (db) {SQLite Database\\(Django ORM)};
+
+  % External
+  \node[cloud, fill=red!10, minimum width=3.5cm, minimum height=1.2cm, right=2.5cm of pdf] (groq) {Groq LLM API\\(llama-3.3-70b)};
+  \node[cloud, fill=yellow!15, minimum width=3.5cm, minimum height=1.2cm, left=2.5cm of rf] (maps) {Google Maps\\(URI Scheme)};
+
+  % Auth
+  \node[block, fill=purple!10, minimum width=3cm, minimum height=1cm, below=1.5cm of rf] (jwt) {JWT Auth\\(SimpleJWT)};
+
+  % Connections
+  \draw[arrow] (client) -- node[right, font=\footnotesize]{renders} (spa);
+  \draw[arrow] (spa) -- node[right, font=\footnotesize]{HTTP REST} (backend);
+  \draw[arrow] (backend) -- node[above, font=\footnotesize]{predict()} (rf);
+  \draw[arrow] (backend) -- node[above, font=\footnotesize]{parse()} (pdf);
+  \draw[arrow] (backend) -- node[right, font=\footnotesize]{ORM queries} (db);
+  \draw[arrow] (pdf) -- node[above, font=\footnotesize]{text} (groq);
+  \draw[dasharrow] (groq) -- node[below, font=\footnotesize]{JSON} (backend);
+  \draw[dasharrow] (backend) -- node[above, font=\footnotesize]{URL} (maps);
+  \draw[arrow] (backend) -- (jwt);
+\end{tikzpicture}
+\caption{Complete box-and-line system architecture diagram for MedPredictX}
+\label{fig:boxline}
+\end{figure}
+
+\section{Data Flow Diagram (Level 0 --- Context Diagram)}
+
+Figure~\ref{fig:dfd0} shows the Level 0 Data Flow Diagram (Context Diagram) for the MedPredictX system.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=3.5cm, every node/.style={font=\small}]
+  % Central process
+  \node[circle, draw=black!70, fill=blue!10, minimum width=3.5cm, text centered, text width=3.2cm] (sys) {\textbf{MedPredictX\\System}};
+
+  % External entities
+  \node[block, fill=gray!10, left=3.5cm of sys, minimum width=2.5cm] (patient) {Patient};
+  \node[block, fill=gray!10, right=3.5cm of sys, minimum width=2.5cm] (doctor) {Doctor};
+  \node[cloud, fill=orange!10, above=2.5cm of sys, minimum width=2.5cm] (groq2) {Groq LLM API};
+  \node[cloud, fill=yellow!10, below=2.5cm of sys, minimum width=2.5cm] (maps2) {Google Maps};
+
+  % Flows
+  \draw[arrow] (patient) -- node[above, font=\footnotesize]{Symptoms / PDF} (sys);
+  \draw[arrow] (sys) -- node[below, font=\footnotesize]{Diagnosis / Recommendation} (patient);
+  \draw[arrow] (doctor) -- node[above, font=\footnotesize]{Appointment actions} (sys);
+  \draw[arrow] (sys) -- node[below, font=\footnotesize]{Patient schedule} (doctor);
+  \draw[arrow] (sys) -- node[right, font=\footnotesize]{Symptom prompt} (groq2);
+  \draw[arrow] (groq2) -- node[left, font=\footnotesize]{JSON specialist rec.} (sys);
+  \draw[dasharrow] (sys) -- node[right, font=\footnotesize]{Specialist URI} (maps2);
+\end{tikzpicture}
+\caption{Level 0 Context Data Flow Diagram for MedPredictX}
+\label{fig:dfd0}
+\end{figure}
+
+\section{Data Flow Diagram (Level 1)}
+
+Figure~\ref{fig:dfd1} decomposes the system into its major internal processes.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=2.5cm and 3.5cm, every node/.style={font=\footnotesize}]
+  % External entity
+  \node[block, fill=gray!10] (user) {User};
+
+  % Processes
+  \node[block, fill=blue!10, right=3cm of user] (auth) {P1:\\Authenticate User};
+  \node[block, fill=green!10, right=3cm of auth] (predict) {P2:\\Predict Disease\\(RF Model)};
+  \node[block, fill=orange!10, below=2.5cm of predict] (recommend) {P3:\\AI Recommend\\(Groq LLM)};
+  \node[block, fill=purple!10, below=2.5cm of auth] (appt) {P4:\\Manage\\Appointments};
+
+  % Data stores
+  \node[db, fill=gray!15, below=1.5cm of user, minimum width=2.5cm] (userdb) {D1:\\User Database};
+  \node[db, fill=gray!15, right=2cm of recommend, minimum width=2.5cm] (modeldb) {D2:\\RF Model\\(joblib)};
+
+  % Flows
+  \draw[arrow] (user) -- node[above]{credentials} (auth);
+  \draw[arrow] (auth) -- node[above]{JWT token} (predict);
+  \draw[arrow] (auth) -- (userdb);
+  \draw[arrow] (predict) -- node[right]{symptom vector} (modeldb);
+  \draw[arrow] (modeldb) -- node[left]{disease label} (predict);
+  \draw[arrow] (predict) -- node[right]{prediction} (user);
+  \draw[arrow] (recommend) -- node[above]{LLM prompt} (predict);
+  \draw[arrow] (user) -- node[left]{symptoms/PDF} (recommend);
+  \draw[arrow] (recommend) -- node[below]{specialist rec.} (user);
+  \draw[arrow] (user) -- (appt);
+  \draw[arrow] (appt) -- (userdb);
+\end{tikzpicture}
+\caption{Level 1 Data Flow Diagram showing internal MedPredictX processes}
+\label{fig:dfd1}
+\end{figure}

@@ -1,0 +1,35 @@
+\chapter{INTRODUCTION}
+
+\section{Background and Motivation}
+
+The global healthcare infrastructure is facing an unprecedented and accelerating strain. This stress is primarily driven by three converging macroeconomic and demographic factors: exponentially rising global populations, the increasing prevalence of chronic diseases linked to aging demographics, and a chronic, widespread shortage of licensed medical professionals. Across various global healthcare systems---from heavily privatized models to state-sponsored universal healthcare networks---patients frequently face excessively long wait times to consult with specialists.
+
+A critical bottleneck in this clinical pipeline occurs at the preliminary triage phase. When an individual experiences an onset of novel symptoms, they face an immediate cognitive hurdle: they lack the specialized medical knowledge necessary to accurately identify the underlying physiological causes of their symptoms or to determine which specific subset of physician (e.g., Neurologist vs.\ Rheumatologist vs.\ General Practitioner) is most appropriate for their specific medical conditions. This systemic inefficiency not only delays critical and potentially life-saving care but also severely overburdens primary care physicians and general practitioners with misdirected appointments, unnecessary consultations, and administrative bloat.
+
+In recent years, the digitization of healthcare---commonly referred to as telemedicine or e-health---has attempted to bridge this gap. However, first-generation telemedicine platforms primarily function as digital scheduling tools and video-conferencing systems. They fundamentally lack any inherent diagnostic intelligence or clinical decision support capabilities. Consequently, when a patient feels unwell, they are often forced to bypass these platforms and rely on inaccurate internet searches. This practice frequently leads to heightened psychological distress, a phenomenon colloquially known as `cyberchondria', where benign symptoms are rapidly misinterpreted as indicators of severe conditions. There is an urgent, pressing need for a system that can intelligently parse unstructured patient symptoms and provide grounded, data-driven medical triage.
+
+MedPredictX directly addresses this gap by integrating machine learning-based disease prediction with an AI-powered specialist recommender into a single, cohesive web application. The system is designed to be accessible to patients with varying levels of technical and medical literacy, providing actionable insights immediately and at no cost to the user.
+
+\section{System Objectives}
+
+The primary objective of MedPredictX is to automate, democratize, and optimize the preliminary medical triage process. By providing patients with immediate, data-driven medical insights before they ever visit a physical clinic, the system aims to drastically reduce time-to-care. To achieve this overarching goal, the MedPredictX architecture is designed with the following specific, measurable objectives:
+
+\begin{enumerate}
+    \item \textbf{Implement a Local Machine Learning Disease Predictor:} To evaluate exactly 132 distinct human symptoms using a rigorously trained Random Forest machine learning classifier. This classifier outputs a precise disease prediction entirely on the local server hardware to guarantee data privacy and ultra-low inference latency.
+
+    \item \textbf{Develop an AI Specialist Recommender:} To parse unstructured natural language symptoms or natively extract and interpret medical text from uploaded PDF laboratory reports, leveraging Large Language Models (LLMs) via the Groq API.
+
+    \item \textbf{Enable Geographic Specialist Matching:} To facilitate seamless transitions from digital triage to physical clinical care by dynamically generating Google Maps Search URIs, instantly locating the nearest recommended medical specialists.
+
+    \item \textbf{Deliver a Unified, Modality-Agnostic User Experience:} To provide a secure, responsive, and unified user interface through a consolidated ``Medical Triage Hub'', allowing users to input data via text or file uploads.
+
+    \item \textbf{Provide Comprehensive Practice Management:} To equip licensed doctors and system administrators with secure dashboards for managing appointments, reviewing patient histories, and overseeing system utilization via JWT authentication.
+\end{enumerate}
+
+\section{Scope and Limitations}
+
+The scope of this thesis encompasses the complete end-to-end design, algorithmic development, security hardening, and integration of the MedPredictX web application and its dual-AI modules. It explicitly details the development of the patient-facing Single Page Application (SPA), the secure doctor dashboards, administrative controls, and the Django RESTful API backend.
+
+While MedPredictX is designed to be clinically relevant, it operates under strictly defined limitations. Most importantly, MedPredictX is strictly an \textbf{informational triage and routing system}; it is emphatically \textbf{not} a legal replacement for professional medical diagnosis. This disclaimer is embedded within the application UI.
+
+Technically, the local Random Forest model is mathematically constrained to the 132-dimensional binary vector space defined by its training dataset. Furthermore, due to the rapid deprecation of upstream Vision APIs (specifically the decommissioning of Groq's \texttt{llama-3.2-11b-vision-preview} model), the visual processing of raw image files (JPG/PNG) has been deprecated. The architecture now favors robust, native PDF text extraction. Future capabilities such as EHR integration via HL7/FHIR protocols and real-time video telemetry are considered out-of-scope for this iteration.

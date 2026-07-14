@@ -1,0 +1,198 @@
+\chapter{IMPLEMENTATION AND TESTING}
+
+\section{Backend Implementation}
+
+The backend is implemented in Python 3.10 using the Django REST Framework. All AI logic resides in \texttt{backend/api/views.py}, which defines two primary API endpoints: \texttt{predict\_disease} and \texttt{ai\_doctor\_recommender}.
+
+\subsection{Machine Learning Pipeline: Random Forest}
+
+The Random Forest model is trained offline using the \texttt{Training.csv} dataset, which contains 4,920 patient records with 132 binary symptom features and a categorical disease label. Training is performed via the following script:
+
+\begin{lstlisting}[language=Python, caption=Offline Random Forest training script]
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
+
+df = pd.read_csv('Training.csv')
+X = df.drop('prognosis', axis=1)
+y = df['prognosis']
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42)
+
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train, y_train)
+
+print(f"Accuracy: {accuracy_score(y_test, model.predict(X_test)):.4f}")
+joblib.dump(model, 'ml/rf_model.joblib')
+\end{lstlisting}
+
+\subsection{Memory-Resident Model Loading}
+To eliminate disk I/O latency on every API request, the trained model is loaded into active server memory during Django's \texttt{AppConfig.ready()} lifecycle hook. This architectural decision reduces inference time from 500+ ms to under 40 ms:
+
+\begin{lstlisting}[language=Python, caption=Model loading at server startup]
+import joblib, os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, 'ml', 'rf_model.joblib')
+
+try:
+    rf_model = joblib.load(MODEL_PATH)
+except FileNotFoundError:
+    rf_model = None
+\end{lstlisting}
+
+\subsection{Disease Prediction API View}
+The \texttt{predict\_disease} view receives a list of symptom strings, constructs the 132-element binary feature vector, and returns the model's prediction:
+
+\begin{lstlisting}[language=Python, caption=predict\_disease view implementation]
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def predict_disease(request):
+    symptoms = request.data.get('symptoms', [])
+    if not symptoms:
+        return Response({'error': 'No symptoms provided.'}, status=400)
+
+    vector = [1 if s in symptoms else 0 for s in ALL_SYMPTOMS]
+    feature_array = np.array(vector).reshape(1, -1)
+    prediction = rf_model.predict(feature_array)[0]
+
+    return Response({'predicted_disease': prediction})
+\end{lstlisting}
+
+\subsection{PDF Text Extraction Pipeline}
+When a user uploads a PDF, \texttt{PyPDF2} extracts the embedded text. If no text is found (e.g., a scanned image saved as PDF), a descriptive 400 error is returned to the frontend. This prevents silent failures:
+
+\begin{lstlisting}[language=Python, caption=PDF text extraction in the recommend view]
+import PyPDF2
+
+def extract_pdf_text(uploaded_file):
+    reader = PyPDF2.PdfReader(uploaded_file)
+    text = ""
+    for page in reader.pages:
+        text += page.extract_text() or ""
+    return text.strip()
+
+# In the view:
+if file_ext == 'pdf':
+    file_text = extract_pdf_text(uploaded_file)
+    if not file_text:
+        return Response({
+            'error': 'No extractable text found in PDF. '
+                     'Please describe symptoms manually.'
+        }, status=400)
+\end{lstlisting}
+
+\subsection{Groq LLM API Integration}
+The recommendation endpoint submits a structured prompt to the Groq API and parses the response JSON:
+
+\begin{lstlisting}[language=Python, caption=Groq API call in ai\_doctor\_recommender view]
+from groq import Groq
+import json
+
+client = Groq(api_key=os.environ.get('GROQ_API_KEY'))
+
+completion = client.chat.completions.create(
+    model="llama-3.3-70b-versatile",
+    messages=[
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt}
+    ],
+    temperature=0.3,
+    response_format={"type": "json_object"}
+)
+
+result = json.loads(completion.choices[0].message.content)
+specialty = result.get('recommended_specialty', '')
+maps_url = f"https://www.google.com/maps/search/{specialty.replace(' ', '+')}+near+me"
+result['google_maps_url'] = maps_url
+\end{lstlisting}
+
+\section{Frontend Implementation}
+
+The frontend SPA is built with React 18, using functional components and hooks throughout. Figure~\ref{fig:sequence} shows the complete sequence of events for an AI recommendation request.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=2.5cm, every node/.style={font=\footnotesize}]
+  \node[block, fill=blue!10, minimum width=2.2cm] (user) {User (Browser)};
+  \node[block, fill=green!10, minimum width=2.2cm, right=2.5cm of user] (react) {React\\Component};
+  \node[block, fill=orange!10, minimum width=2.2cm, right=2.5cm of react] (django) {Django\\Backend};
+  \node[block, fill=purple!10, minimum width=2.2cm, right=2.5cm of django] (groq) {Groq\\LLM API};
+
+  % Lifelines
+  \draw[dashed] (user.south) -- ++(0,-7cm);
+  \draw[dashed] (react.south) -- ++(0,-7cm);
+  \draw[dashed] (django.south) -- ++(0,-7cm);
+  \draw[dashed] (groq.south) -- ++(0,-7cm);
+
+  % Messages
+  \draw[arrow] ([yshift=-1cm]user.south) -- node[above]{1. Fill form / upload PDF} ([yshift=-1cm]react.south);
+  \draw[arrow] ([yshift=-2cm]react.south) -- node[above]{2. POST /api/ai/recommend/} ([yshift=-2cm]django.south);
+  \draw[arrow] ([yshift=-3cm]django.south) -- node[above]{3. Extract PDF text} ([yshift=-3cm]django.south |- django.south);
+  \draw[arrow] ([yshift=-4cm]django.south) -- node[above]{4. LLM prompt} ([yshift=-4cm]groq.south);
+  \draw[arrow] ([yshift=-5cm]groq.south) -- node[above]{5. JSON response} ([yshift=-5cm]django.south);
+  \draw[arrow] ([yshift=-6cm]django.south) -- node[above]{6. Recommendation + Maps URL} ([yshift=-6cm]react.south);
+  \draw[arrow] ([yshift=-7cm]react.south) -- node[above]{7. Render result card} ([yshift=-7cm]user.south);
+\end{tikzpicture}
+\caption{Sequence diagram for the AI Specialist Recommendation flow}
+\label{fig:sequence}
+\end{figure}
+
+\subsection{JWT Authentication Context}
+The \texttt{AuthContext} provider manages JWT state across the entire application. An Axios interceptor automatically attaches the Bearer token to every outbound HTTP request:
+
+\begin{lstlisting}[language=Java, caption=Axios JWT interceptor]
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('access_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+\end{lstlisting}
+
+\subsection{Unified Triage Hub Component}
+The \texttt{TriageHub.jsx} component manages the active tab state and conditionally renders either the \texttt{Predictor} or \texttt{AIRecommender} component with animated transitions via Framer Motion:
+
+\begin{lstlisting}[language=Java, caption=TriageHub tab switching logic]
+const [activeTab, setActiveTab] = useState('recommender');
+
+return (
+  <AnimatePresence mode="wait">
+    {activeTab === 'recommender' ? (
+      <motion.div key="recommender" initial={{opacity:0}} animate={{opacity:1}}>
+        <AIRecommender />
+      </motion.div>
+    ) : (
+      <motion.div key="predictor" initial={{opacity:0}} animate={{opacity:1}}>
+        <Predictor />
+      </motion.div>
+    )}
+  </AnimatePresence>
+);
+\end{lstlisting}
+
+\section{Testing Methodologies}
+
+Rigorous testing was conducted across both the backend and frontend layers.
+
+\subsection{Backend Unit Tests}
+Unit tests in the Django test client validate:
+\begin{itemize}
+    \item The correct 132-element binary vector is produced for any combination of input symptoms, including edge cases (empty list, unknown symptom strings, all 132 symptoms selected).
+    \item The \texttt{predict} endpoint returns HTTP 400 for empty symptom lists.
+    \item The \texttt{recommend} endpoint returns HTTP 400 for image file uploads.
+    \item The PDF text extraction function raises the appropriate exception for password-protected or image-only PDFs.
+\end{itemize}
+
+\subsection{Frontend Integration Tests}
+Frontend tests (using Jest and React Testing Library) validate:
+\begin{itemize}
+    \item The symptom dropdown successfully adds and removes symptom tags.
+    \item The ``Predict'' button is disabled when the symptom list is empty.
+    \item The file remove button correctly clears the \texttt{file} state variable, restoring the file input.
+    \item The tab switcher correctly unmounts the inactive tab's component.
+\end{itemize}

@@ -1,0 +1,211 @@
+\chapter{SOFTWARE REQUIREMENTS SPECIFICATION (SRS)}
+
+\section{Introduction}
+
+\subsection{Document Purpose}
+The purpose of this Software Requirements Specification (SRS) is to provide a comprehensive and unambiguous description of the MedPredictX platform. This document is intended for use by the development team, academic reviewers, and any future contributors. It defines what the system must do, the constraints under which it must operate, and the quality attributes it must exhibit.
+
+\subsection{Product Scope}
+MedPredictX is a fully decoupled, multi-tier web application encompassing:
+\begin{itemize}
+    \item A responsive React-based Single Page Application (SPA) frontend, scaffolded with Vite.
+    \item A Django REST Framework (DRF) backend exposing secure, versioned REST APIs.
+    \item A dual-engine AI pipeline: a local scikit-learn Random Forest model and an external Groq LLM integration.
+    \item An SQLite-backed relational database managed via the Django ORM.
+\end{itemize}
+
+\subsection{Definitions, Acronyms, and Abbreviations}
+\begin{table}[htbp]
+\centering
+\caption{Terminology used in this SRS}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Term} & \textbf{Definition} \\
+\hline
+API & Application Programming Interface \\
+DRF & Django REST Framework \\
+JWT & JSON Web Token \\
+LLM & Large Language Model \\
+ML & Machine Learning \\
+NLP & Natural Language Processing \\
+SPA & Single Page Application \\
+SRS & Software Requirements Specification \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Document Overview}
+This SRS is organized as follows: Section 4.2 provides an overall system description. Section 4.3 documents specific functional and non-functional requirements. Section 4.4 describes the verification approach.
+
+\section{Overall Description}
+
+\subsection{Product Perspective}
+MedPredictX operates as a standalone web application requiring only a modern web browser on the client side. It is self-contained; the backend manages all AI inference and data persistence internally, interfacing only with the external Groq API for LLM calls.
+
+\subsection{Product Functions}
+The primary system functions are:
+\begin{itemize}
+    \item \textbf{User Registration and Authentication:} Secure sign-up and login for Patients, Doctors, and Administrators using JWT tokens.
+    \item \textbf{Local Disease Prediction:} Accepting a set of selected symptoms and returning a predicted disease via the local Random Forest model.
+    \item \textbf{AI Specialist Recommendation:} Processing free-text symptoms or extracted PDF content and returning a structured specialist recommendation via Groq LLM.
+    \item \textbf{Geo-Location of Specialists:} Generating a Google Maps search URL for the recommended specialty.
+    \item \textbf{Appointment Management:} Patients can book appointments; Doctors can review and manage schedules.
+    \item \textbf{Medical Records:} Patients and Doctors can upload and retrieve medical documents.
+\end{itemize}
+
+\subsection{Product Constraints}
+\begin{itemize}
+    \item The Random Forest model strictly requires a 132-element binary input vector.
+    \item Image file uploads (JPG/PNG) are not supported for AI analysis due to the deprecation of the Groq Vision model.
+    \item Groq API calls require an active internet connection.
+    \item All API endpoints are served over HTTP in development (HTTPS required in production).
+\end{itemize}
+
+\subsection{User Characteristics}
+\begin{itemize}
+    \item \textbf{Patient:} General public user with no required medical or technical knowledge.
+    \item \textbf{Doctor:} Licensed medical professional who manages their appointment schedule and patient records via the platform.
+    \item \textbf{Administrator:} Technical administrator responsible for user management and platform oversight.
+\end{itemize}
+
+\subsection{Assumptions and Dependencies}
+\begin{itemize}
+    \item A valid \texttt{GROQ\_API\_KEY} environment variable is configured in the backend \texttt{.env} file.
+    \item The trained model file \texttt{rf\_model.joblib} is present in the \texttt{backend/ml/} directory.
+    \item The \texttt{Training.csv} symptom dataset with 4,920 records and 132 feature columns has been used to train the model prior to deployment.
+\end{itemize}
+
+\section{Specific Requirements}
+
+\subsection{External Interfaces}
+
+\subsubsection{Disease Prediction Endpoint (\texttt{POST /api/predict/})}
+\begin{itemize}
+    \item \textbf{Request:} JSON body: \texttt{\{"symptoms": ["fatigue", "cough", "fever"]\}}
+    \item \textbf{Response:} JSON body: \texttt{\{"predicted\_disease": "Tuberculosis"\}}
+    \item \textbf{Auth:} Bearer JWT token required.
+\end{itemize}
+
+\subsubsection{AI Recommendation Endpoint (\texttt{POST /api/ai/recommend/})}
+\begin{itemize}
+    \item \textbf{Content-Type:} \texttt{multipart/form-data}
+    \item \textbf{Payload Fields:} \texttt{symptoms} (text), \texttt{age} (integer), \texttt{gender} (text), \texttt{existing\_conditions} (text), \texttt{file} (PDF binary, optional).
+    \item \textbf{Response:} JSON containing \texttt{recommended\_specialty}, \texttt{urgency}, \texttt{reasons[]}, and \texttt{google\_maps\_url}.
+    \item \textbf{Auth:} Bearer JWT token required.
+\end{itemize}
+
+\subsection{Functional Requirements}
+
+\begin{longtable}{|p{0.08\linewidth}|p{0.25\linewidth}|p{0.55\linewidth}|}
+\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\hline
+\endfirsthead
+\hline
+\textbf{ID} & \textbf{Requirement} & \textbf{Description} \\
+\hline
+\endhead
+FR-01 & User Registration & System must allow new users to register with username, email, password, and role selection (Patient/Doctor). \\
+\hline
+FR-02 & JWT Authentication & System must issue JWT access and refresh tokens upon successful login. \\
+\hline
+FR-03 & Symptom Selection & Patient UI must provide a searchable dropdown of all 132 symptoms; selected symptoms are displayed as removable tags. \\
+\hline
+FR-04 & Disease Prediction & On submission, the 132-symptom binary vector is constructed and passed to the RF model; the predicted disease is displayed. \\
+\hline
+FR-05 & Text-Based Recommendation & Patient can describe symptoms in free text; LLM processes this and returns a structured specialist recommendation. \\
+\hline
+FR-06 & PDF Upload \& Analysis & Patient can upload a digital PDF medical report; backend extracts text and passes it to the LLM for analysis. \\
+\hline
+FR-07 & Geo-Location Link & AI recommendation response must include a one-click Google Maps link to search for the recommended specialist nearby. \\
+\hline
+FR-08 & Appointment Booking & Patient must be able to book an appointment with a Doctor from the platform; Doctor can accept or reject. \\
+\hline
+FR-09 & Role-Based Navigation & Navigation menu must dynamically render based on the logged-in user's role. \\
+\hline
+FR-10 & Admin User Management & Administrator must be able to view, create, and deactivate user accounts. \\
+\hline
+\end{longtable}
+
+\subsection{Quality of Service Requirements (Non-Functional Requirements)}
+\begin{itemize}
+    \item \textbf{Performance:} The local Random Forest prediction endpoint must respond within 200ms under standard load conditions.
+    \item \textbf{Availability:} The backend server must be available during all development sessions; stateless JWT design supports horizontal scaling.
+    \item \textbf{Security:} All passwords must be hashed using PBKDF2 with a minimum of 100,000 iterations. JWT secrets must be stored in environment variables, never in source code.
+    \item \textbf{Usability:} All form elements must have clear labels. Error messages must be human-readable and actionable.
+    \item \textbf{Maintainability:} All backend views must be modularized within \texttt{api/views.py}. Frontend components must be single-responsibility.
+\end{itemize}
+
+\subsection{Compliance}
+The system applies basic data minimization principles consistent with GDPR guidelines: no patient symptom data or uploaded PDF content is persisted by the AI recommendation service; data is processed transiently within the API request lifecycle only.
+
+\subsection{Design and Implementation Constraints}
+\begin{itemize}
+    \item Frontend: React 18 with Vite build tooling.
+    \item Backend: Python 3.10+, Django 4.x, Django REST Framework.
+    \item ML: scikit-learn Random Forest, serialized with joblib.
+    \item LLM: Groq API (model: \texttt{llama-3.3-70b-versatile}).
+    \item PDF: PyPDF2 library for text extraction.
+\end{itemize}
+
+\section{The 132 Symptom Vector Dictionary}
+
+The local Random Forest model relies entirely on a strict, predefined vector of 132 symptoms. The frontend must pass exact string matches for these symptoms to ensure the backend maps them correctly to the binary input array.
+
+\begin{longtable}{|p{0.3\linewidth}|p{0.3\linewidth}|p{0.3\linewidth}|}
+\hline
+\textbf{Symptoms 1--44} & \textbf{Symptoms 45--88} & \textbf{Symptoms 89--132} \\ \hline
+\endfirsthead
+\hline
+\textbf{Symptom} & \textbf{Symptom} & \textbf{Symptom} \\ \hline
+\endhead
+itching & acute\_liver\_failure & unsteadiness \\
+skin\_rash & fluid\_overload & weakness\_of\_one\_body\_side \\
+shivering & swelling\_of\_stomach & loss\_of\_smell \\
+chills & swelled\_lymph\_nodes & bladder\_discomfort \\
+joint\_pain & malaise & foul\_smell\_of\_urine \\
+stomach\_pain & blurred\_and\_distorted\_vision & continuous\_feel\_of\_urine \\
+acidity & phlegm & passage\_of\_gases \\
+ulcers\_on\_tongue & throat\_irritation & internal\_itching \\
+muscle\_wasting & redness\_of\_eyes & toxic\_look \\
+vomiting & sinus\_pressure & depression \\
+burning\_micturition & runny\_nose & irritability \\
+spotting\_urination & congestion & muscle\_pain \\
+fatigue & chest\_pain & altered\_sensorium \\
+weight\_gain & weakness\_in\_limbs & red\_spots\_over\_body \\
+anxiety & fast\_heart\_rate & belly\_pain \\
+cold\_hands\_and\_feets & pain\_during\_bowel\_movements & abnormal\_menstruation \\
+mood\_swings & pain\_in\_anal\_region & dischromic\_patches \\
+weight\_loss & bloody\_stool & watering\_from\_eyes \\
+restlessness & irritation\_in\_anus & increased\_appetite \\
+lethargy & neck\_pain & polyuria \\
+patches\_in\_throat & dizziness & family\_history \\
+irregular\_sugar\_level & cramps & mucoid\_sputum \\
+cough & bruising & rusty\_sputum \\
+high\_fever & obesity & lack\_of\_concentration \\
+sunken\_eyes & swollen\_legs & visual\_disturbances \\
+breathlessness & swollen\_blood\_vessels & receiving\_blood\_transfusion \\
+sweating & puffy\_face\_and\_eyes & receiving\_unsterile\_injections \\
+dehydration & enlarged\_thyroid & coma \\
+indigestion & brittle\_nails & stomach\_bleeding \\
+headache & swollen\_extremeties & distention\_of\_abdomen \\
+yellowish\_skin & excessive\_hunger & history\_of\_alcohol\_consumption \\
+dark\_urine & extra\_marital\_contacts & blood\_in\_sputum \\
+nausea & drying\_and\_tingling\_lips & prominent\_veins\_on\_calf \\
+loss\_of\_appetite & slurred\_speech & palpitations \\
+pain\_behind\_the\_eyes & knee\_pain & painful\_walking \\
+back\_pain & hip\_joint\_pain & pus\_filled\_pimples \\
+constipation & muscle\_weakness & blackheads \\
+abdominal\_pain & stiff\_neck & scurring \\
+diarrhoea & swelling\_joints & skin\_peeling \\
+mild\_fever & movement\_stiffness & silver\_like\_dusting \\
+yellow\_urine & spinning\_movements & small\_dents\_in\_nails \\
+yellowing\_of\_eyes & loss\_of\_balance & inflammatory\_nails \\
+(blister) & (red\_sore\_around\_nose) & (yellow\_crust\_ooze) \\ \hline
+\end{longtable}
+
+\section{Verification}
+Unit tests validate the 132-vector binary array construction logic. A single off-by-one index mismatch in this mapping would result in incorrect model predictions, hence all 132 indices are verified against the training dataset column order. Backend API responses are validated against expected JSON schemas using DRF's built-in test client. Frontend form validation ensures that at least one symptom OR one PDF file is present before a submission is accepted.
+
+\section{Appendixes}
+Detailed architectural diagrams, data flow diagrams, and UML models are provided in Appendices A and B.

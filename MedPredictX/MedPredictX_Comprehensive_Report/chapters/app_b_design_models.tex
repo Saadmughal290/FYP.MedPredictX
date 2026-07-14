@@ -1,0 +1,157 @@
+\chapter{Appendix B: UML Design Models}
+\addcontentsline{toc}{chapter}{Appendix B: UML Design Models}
+
+\section{Use Case Diagram}
+
+Figure~\ref{fig:usecase} shows the primary use cases for each actor in the MedPredictX system.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[every node/.style={font=\small}]
+  % System boundary
+  \draw[rounded corners, draw=black!50, fill=blue!3, thick] (1.5,-0.3) rectangle (9.5,8.5);
+  \node at (5.5, 8.8) {\textbf{MedPredictX System}};
+
+  % Patient actor
+  \node[font=\small] at (-1, 7) {\textbf{Patient}};
+  \draw (-1,6.5) circle (0.3);
+  \draw (-1,6.5) -- (-1,5.8);
+  \draw (-1,5.8) -- (-1.4,5.3);
+  \draw (-1,5.8) -- (-0.6,5.3);
+  \draw (-1,5.8) -- (-1.3,6.1);
+  \draw (-1,5.8) -- (-0.7,6.1);
+
+  % Doctor actor
+  \node[font=\small] at (11, 5) {\textbf{Doctor}};
+  \draw (11,4.5) circle (0.3);
+  \draw (11,4.5) -- (11,3.8);
+  \draw (11,3.8) -- (11.4,3.3);
+  \draw (11,3.8) -- (10.6,3.3);
+  \draw (11,3.8) -- (11.3,4.1);
+  \draw (11,3.8) -- (10.7,4.1);
+
+  % Use cases
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (login) at (5.5,7.5) {Login / Register};
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (predict) at (5.5,6) {Predict Disease\\(RF Model)};
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (recommend) at (5.5,4.5) {Get AI Recommendation\\(Text or PDF)};
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (maps) at (5.5,3) {Find Nearest Specialist\\(Google Maps)};
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (appt) at (5.5,1.5) {Book Appointment};
+  \node[ellipse, draw, fill=white, minimum width=4cm, align=center] (schedule) at (5.5,0) {Manage Schedule};
+
+  % Patient connections
+  \draw (-0.7,6.2) -- (3.5,7.5);
+  \draw (-0.7,6.0) -- (3.5,6);
+  \draw (-0.7,5.8) -- (3.5,4.5);
+  \draw (-0.7,5.6) -- (3.5,3);
+  \draw (-0.7,5.4) -- (3.5,1.5);
+
+  % Doctor connections
+  \draw (10.7,4.2) -- (7.5,4.5);
+  \draw (10.7,4.0) -- (7.5,3);
+  \draw (10.7,3.8) -- (7.5,1.5);
+  \draw (10.7,3.6) -- (7.5,0);
+\end{tikzpicture}
+\caption{Use case diagram showing actor interactions with MedPredictX}
+\label{fig:usecase}
+\end{figure}
+
+\section{Activity Diagram: Disease Prediction Flow}
+
+Figure~\ref{fig:activity_predict} shows the complete activity flow for the Local Disease Prediction feature.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+  % Start
+  \node[circle, fill=black, minimum size=0.4cm] (start) {};
+  \node[block, fill=blue!10, below of=start] (select) {Patient Selects Symptoms\\from Dropdown};
+  \node[block, fill=blue!10, below of=select] (add) {Symptom Added to\\Selected Tags List};
+  \node[diamond, aspect=2, draw, fill=yellow!15, below=1.4cm of add, text width=3cm, align=center] (enough) {At least 1\\symptom?};
+  \node[block, fill=blue!10, below of=enough, node distance=1.8cm] (submit) {Click ``Predict Disease''\\Button};
+  \node[block, fill=green!10, below of=submit] (api) {POST /api/predict/\\(JWT Authenticated)};
+  \node[block, fill=orange!10, below of=api] (vector) {Build 132-element\\Binary Feature Vector};
+  \node[block, fill=orange!10, below of=vector] (model) {RF Model Inference\\(joblib, in-memory)};
+  \node[block, fill=green!10, below of=model] (display) {Display Predicted\\Disease Card};
+  \node[circle, draw, fill=black, minimum size=0.4cm, below of=display] (end) {};
+  \node[block, fill=red!10, right=2.5cm of enough] (warn) {Show Warning:\\``Add at least 1 symptom''};
+
+  \draw[arrow] (start) -- (select);
+  \draw[arrow] (select) -- (add);
+  \draw[arrow] (add) -- (enough);
+  \draw[arrow] (enough) -- node[left, font=\footnotesize]{Yes} (submit);
+  \draw[arrow] (enough) -- node[above, font=\footnotesize]{No} (warn);
+  \draw[arrow] (warn) |- (select);
+  \draw[arrow] (submit) -- (api);
+  \draw[arrow] (api) -- (vector);
+  \draw[arrow] (vector) -- (model);
+  \draw[arrow] (model) -- (display);
+  \draw[arrow] (display) -- (end);
+\end{tikzpicture}
+\caption{Activity diagram for Local Disease Prediction workflow}
+\label{fig:activity_predict}
+\end{figure}
+
+\section{Activity Diagram: AI Recommendation Flow}
+
+Figure~\ref{fig:activity_recommend} shows the activity flow for the AI Specialist Recommender feature.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.6cm, every node/.style={font=\small}]
+  \node[circle, fill=black, minimum size=0.4cm] (start) {};
+  \node[block, fill=blue!10, below of=start] (input) {Patient Provides Input:\\Symptoms Text or PDF Upload};
+  \node[diamond, aspect=2, draw, fill=yellow!15, below=1.4cm of input, text width=3cm, align=center] (hasfile) {PDF\\uploaded?};
+  \node[block, fill=orange!10, below right=1cm and 1.5cm of hasfile] (extract) {Extract Text\\(PyPDF2)};
+  \node[diamond, aspect=2, draw, fill=yellow!15, below=1.4cm of extract, text width=2.5cm, align=center] (hastext) {Text\\found?};
+  \node[block, fill=red!10, right=2.5cm of hastext] (err) {Return 400:\\``No readable text''};
+  \node[block, fill=green!10, below=4cm of hasfile] (prompt) {Build LLM Prompt\\(symptoms + context)};
+  \node[block, fill=orange!10, below of=prompt] (groq3) {Call Groq API\\(llama-3.3-70b)};
+  \node[block, fill=green!10, below of=groq3] (parse) {Parse JSON Response};
+  \node[block, fill=blue!10, below of=parse] (mapurl) {Generate Google Maps URL};
+  \node[block, fill=green!10, below of=mapurl] (show) {Display Result Card\\+ Maps Button};
+  \node[circle, draw, fill=black, minimum size=0.4cm, below of=show] (end) {};
+
+  \draw[arrow] (start) -- (input);
+  \draw[arrow] (input) -- (hasfile);
+  \draw[arrow] (hasfile) -- node[right, font=\footnotesize]{Yes} (extract);
+  \draw[arrow] (hasfile) -- node[left, font=\footnotesize]{No (text)} (prompt);
+  \draw[arrow] (extract) -- (hastext);
+  \draw[arrow] (hastext) -- node[right, font=\footnotesize]{No} (err);
+  \draw[arrow] (hastext) -- node[left, font=\footnotesize]{Yes} (prompt);
+  \draw[arrow] (prompt) -- (groq3);
+  \draw[arrow] (groq3) -- (parse);
+  \draw[arrow] (parse) -- (mapurl);
+  \draw[arrow] (mapurl) -- (show);
+  \draw[arrow] (show) -- (end);
+\end{tikzpicture}
+\caption{Activity diagram for AI Specialist Recommendation workflow}
+\label{fig:activity_recommend}
+\end{figure}
+
+\section{State Machine Diagram: Triage Hub}
+
+Figure~\ref{fig:state} shows the state machine for the Unified Medical Triage Hub UI component.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=2.5cm and 3cm, every node/.style={font=\small}]
+  \node[circle, fill=black, minimum size=0.4cm] (initial) {};
+  \node[block, fill=blue!10, right=2cm of initial] (hub) {Hub Idle\\(Recommender Tab Active)};
+  \node[block, fill=green!10, above right=1cm and 2.5cm of hub] (recommender) {AI Recommender\\Form Visible};
+  \node[block, fill=orange!10, below right=1cm and 2.5cm of hub] (predictor) {Predictor\\Form Visible};
+  \node[block, fill=green!15, right=3cm of recommender] (recresult) {Recommendation\\Result Displayed};
+  \node[block, fill=orange!15, right=3cm of predictor] (predresult) {Prediction\\Result Displayed};
+
+  \draw[arrow] (initial) -- (hub);
+  \draw[arrow] (hub) -- node[above, font=\footnotesize]{Tab: Recommender} (recommender);
+  \draw[arrow] (hub) -- node[below, font=\footnotesize]{Tab: Predictor} (predictor);
+  \draw[arrow] (recommender) -- node[above, font=\footnotesize]{Submit Success} (recresult);
+  \draw[arrow] (recresult) -- node[below, font=\footnotesize]{``Try Again''} (recommender);
+  \draw[arrow] (predictor) -- node[above, font=\footnotesize]{Submit Success} (predresult);
+  \draw[arrow] (predresult) -- node[below, font=\footnotesize]{``Clear''} (predictor);
+  \draw[dasharrow, bend left=40] (recommender) to node[left, font=\footnotesize]{Switch Tab} (predictor);
+  \draw[dasharrow, bend right=40] (predictor) to node[right, font=\footnotesize]{Switch Tab} (recommender);
+\end{tikzpicture}
+\caption{State machine diagram for the Unified Medical Triage Hub component}
+\label{fig:state}
+\end{figure}

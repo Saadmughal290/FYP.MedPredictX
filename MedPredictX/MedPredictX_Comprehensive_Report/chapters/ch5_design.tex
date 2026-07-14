@@ -1,0 +1,165 @@
+\chapter{SOFTWARE DESIGN SPECIFICATION}
+
+\section{Design Methodology and Software Process Model}
+
+MedPredictX was developed using an iterative Agile methodology. Development proceeded in short cycles, with each sprint delivering a working, testable increment of functionality. This approach was chosen because the AI component requirements (specifically, the selection of an appropriate LLM API and the deprecation of the Groq Vision model) were subject to change based on external factors, making a rigid Waterfall approach unsuitable.
+
+The software process followed a clear progression:
+\begin{enumerate}
+    \item \textbf{Sprint 1:} Backend scaffolding --- Django project setup, custom user model, JWT auth, and initial REST API endpoints.
+    \item \textbf{Sprint 2:} ML integration --- Training the Random Forest model on \texttt{Training.csv}, serializing with \texttt{joblib}, and exposing the \texttt{/api/predict/} endpoint.
+    \item \textbf{Sprint 3:} Groq LLM integration --- Implementing the \texttt{/api/ai/recommend/} endpoint, supporting both text and PDF inputs.
+    \item \textbf{Sprint 4:} Frontend development --- React SPA, JWT auth flow, Predictor and Recommender components.
+    \item \textbf{Sprint 5:} UI consolidation --- Merging Predictor and Recommender into the Unified Triage Hub with tabbed navigation.
+\end{enumerate}
+
+\section{System Architecture Overview}
+
+MedPredictX is engineered as a three-tier decoupled architecture, as illustrated in Figure~\ref{fig:architecture}.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=1.8cm and 3cm, every node/.style={font=\small}]
+
+  % Tier 1 - Frontend
+  \node[block, fill=blue!15, minimum width=3.5cm] (browser) {Browser (Patient/\\Doctor/Admin)};
+  \node[block, fill=blue!10, below of=browser] (react) {React SPA\\(Vite, JSX)};
+  \node[block, fill=blue!10, below of=react] (axios) {Axios + JWT\\Interceptor};
+
+  % Tier 2 - Backend
+  \node[block, fill=green!15, minimum width=3.5cm, right=3.5cm of react] (drf) {Django REST\\Framework};
+  \node[block, fill=green!10, above of=drf] (jwt) {JWT Auth\\(SimpleJWT)};
+  \node[block, fill=green!10, below of=drf] (views) {API Views\\(views.py)};
+
+  % Tier 3 - Services
+  \node[block, fill=orange!15, minimum width=3cm, right=3cm of drf] (rf) {Random Forest\\(joblib)};
+  \node[block, fill=orange!15, minimum width=3cm, below of=rf] (groq) {Groq LLM API\\(llama-3.3-70b)};
+  \node[db, fill=gray!15, minimum width=3cm, above of=rf] (db) {SQLite DB\\(Django ORM)};
+
+  % Arrows
+  \draw[arrow] (browser) -- (react);
+  \draw[arrow] (react) -- (axios);
+  \draw[arrow] (axios) -- node[above, font=\footnotesize]{HTTP REST} (drf);
+  \draw[arrow] (drf) -- (jwt);
+  \draw[arrow] (drf) -- (views);
+  \draw[arrow] (views) -- node[above, font=\footnotesize]{predict()} (rf);
+  \draw[arrow] (views) -- node[below, font=\footnotesize]{LLM call} (groq);
+  \draw[arrow] (drf) -- (db);
+
+\end{tikzpicture}
+\caption{Three-tier architecture of MedPredictX}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Presentation Tier (Frontend)}
+Built with React.js and scaffolded via Vite, this tier is responsible for rendering the user interface, managing client state via Context APIs and React hooks, and executing asynchronous HTTP requests to the backend. The \texttt{AuthContext} provider wraps the entire application tree, maintaining the decoded JWT payload in memory to drive role-based routing and navigation.
+
+\subsection{Application Logic Tier (Backend)}
+Built with Python and the Django REST Framework. This tier handles HTTP request routing, JWT validation, business logic execution, PDF text extraction via \texttt{PyPDF2}, and communication with both local ML models and the external Groq API.
+
+\subsection{Data Tier}
+Utilizes SQLite in development (configurable to PostgreSQL for production) via Django's ORM, ensuring data integrity and rapid relational querying.
+
+\section{Database Schema Design}
+
+The database schema is highly relational. Figure~\ref{fig:erd} shows the core entity relationships.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=3cm, every node/.style={font=\small}]
+  \node[block, fill=blue!10, text width=3.2cm, align=left] (user) {\textbf{CustomUser}\\-- id (PK)\\-- username\\-- email (unique)\\-- password (hashed)};
+  \node[block, fill=green!10, text width=3.2cm, align=left, right=3cm of user] (patient) {\textbf{PatientProfile}\\-- user (1-to-1 FK)\\-- date\_of\_birth\\-- phone\_number};
+  \node[block, fill=orange!10, text width=3.2cm, align=left, below=2cm of user] (doctor) {\textbf{DoctorProfile}\\-- user (1-to-1 FK)\\-- specialty\\-- qualifications\\-- experience\_years};
+  \node[block, fill=purple!10, text width=3.2cm, align=left, below=2cm of patient] (appt) {\textbf{Appointment}\\-- patient (FK)\\-- doctor (FK)\\-- appointment\_date\\-- status};
+
+  \draw[arrow] (user) -- (patient);
+  \draw[arrow] (user) -- (doctor);
+  \draw[arrow] (patient) -- (appt);
+  \draw[arrow] (doctor) -- (appt);
+\end{tikzpicture}
+\caption{Entity-Relationship Diagram for MedPredictX database}
+\label{fig:erd}
+\end{figure}
+
+\subsection{Custom User Authentication Model}
+The system overrides the default Django auth model (\texttt{AbstractUser}) to use \texttt{email} as the primary authentication identifier:
+\begin{lstlisting}[language=Python, caption=CustomUser model definition]
+class CustomUser(AbstractUser):
+    email = models.EmailField(unique=True)
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
+\end{lstlisting}
+
+\subsection{Polymorphic Profile Extension}
+A One-to-One relationship branches the base user into \texttt{PatientProfile} and \texttt{DoctorProfile}, allowing role-specific metadata without cluttering the base authentication table:
+\begin{lstlisting}[language=Python, caption=DoctorProfile model definition]
+class DoctorProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    specialty = models.CharField(max_length=100)
+    qualifications = models.TextField()
+    experience_years = models.IntegerField()
+\end{lstlisting}
+
+\subsection{Appointment Junction}
+The \texttt{Appointment} model links a Patient, a Doctor, and a timestamp:
+\begin{lstlisting}[language=Python, caption=Appointment model definition]
+class Appointment(models.Model):
+    patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    doctor = models.ForeignKey(DoctorProfile, on_delete=models.CASCADE)
+    appointment_date = models.DateTimeField()
+    status = models.CharField(max_length=20, default='PENDING')
+\end{lstlisting}
+
+\section{User Interface Component Design}
+
+The architectural centerpiece of the frontend is the \textbf{Unified Medical Triage Hub} (\texttt{TriageHub.jsx}). Figure~\ref{fig:triage_flow} shows the UI navigation flow for a Patient user.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=2cm, every node/.style={font=\small}]
+  \node[block, fill=blue!10] (login) {Login Page};
+  \node[block, fill=blue!10, right=2.5cm of login] (dashboard) {Patient Dashboard};
+  \node[block, fill=green!10, right=2.5cm of dashboard] (hub) {Medical Triage Hub};
+  \node[block, fill=green!10, above right=1cm and 1.5cm of hub] (predictor) {Tab: Disease Predictor\\(RF Model)};
+  \node[block, fill=green!10, below right=1cm and 1.5cm of hub] (recommender) {Tab: AI Recommender\\(Groq LLM)};
+  \node[block, fill=orange!10, right=2cm of recommender] (result) {Recommendation\\+ Maps Link};
+
+  \draw[arrow] (login) -- (dashboard);
+  \draw[arrow] (dashboard) -- (hub);
+  \draw[arrow] (hub) -- (predictor);
+  \draw[arrow] (hub) -- (recommender);
+  \draw[arrow] (recommender) -- (result);
+\end{tikzpicture}
+\caption{Patient UI navigation flow through the Medical Triage Hub}
+\label{fig:triage_flow}
+\end{figure}
+
+To mitigate cognitive load when selecting from 132 symptoms or uploading complex documents, the Triage Hub implements a tabbed interface managed by React \texttt{useState}. Within the Recommender itself (\texttt{AIRecommender.jsx}), a responsive two-column card layout separates ``Option 1: Manual Symptom Entry'' from ``Option 2: PDF Report Upload''. Dynamic form validation and animated state transitions powered by Framer Motion provide immediate visual feedback to the user.
+
+\section{Data Design}
+
+\subsection{ML Feature Vector Construction}
+The most critical data transformation in the system is the conversion of a patient's selected symptom strings into a 132-element binary NumPy array. This is implemented in \texttt{views.py} as follows:
+
+\begin{lstlisting}[language=Python, caption=Symptom-to-binary vector construction]
+ALL_SYMPTOMS = ['itching', 'skin_rash', 'shivering', ...]  # 132 items
+
+def build_feature_vector(selected_symptoms):
+    vector = [1 if s in selected_symptoms else 0
+              for s in ALL_SYMPTOMS]
+    return np.array(vector).reshape(1, -1)
+\end{lstlisting}
+
+\subsection{LLM Prompt Engineering}
+The Groq LLM is constrained by a carefully engineered system prompt that forces the response into a specific, parseable JSON schema. This prevents the LLM from returning unstructured prose that the frontend cannot reliably parse:
+
+\begin{lstlisting}[language=Python, caption=System prompt for Groq LLM]
+SYSTEM_PROMPT = """You are a medical triage assistant.
+Return ONLY valid JSON with this exact schema:
+{
+  "recommended_specialty": "string",
+  "urgency": "Low|Medium|High|Emergency",
+  "reasons": ["string", ...],
+  "self_care_tips": ["string", ...]
+}"""
+\end{lstlisting}

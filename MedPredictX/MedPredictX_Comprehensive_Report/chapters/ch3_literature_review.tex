@@ -1,0 +1,53 @@
+\chapter{LITERATURE REVIEW}
+
+\section{Evolution of Machine Learning in Medical Diagnosis}
+
+The application of machine learning (ML) to medical diagnosis has a rich academic history spanning over three decades. Early works in the 1990s pioneered the use of Artificial Neural Networks (ANNs) for pattern recognition in medical imaging and EEG data. By the early 2000s, Support Vector Machines (SVMs) demonstrated exceptional performance on small, high-dimensional datasets, making them a dominant choice for symptom-based binary and multi-class disease classifiers. The landmark study by Shortliffe and Buchanan (1975) on the MYCIN expert system established a formal framework for rule-based clinical decision support, a paradigm later supplanted by probabilistic, data-driven methods.
+
+\subsection{Ensemble Methods and Random Forests}
+The introduction of Random Forest by Leo Breiman in 2001 represented a significant leap forward. By aggregating the predictions of hundreds of decorrelated decision trees, Random Forests demonstrated substantially lower variance than single-tree classifiers while maintaining interpretability. For symptom-based disease prediction tasks---where the feature space is discrete and binary (a symptom is either present or absent)---ensemble methods consistently outperform single-model approaches. Multiple studies have demonstrated Random Forest accuracy exceeding 95\% on publicly available symptom-disease datasets similar to the one employed in MedPredictX, with key advantages including robustness to class imbalance and the ability to produce feature importance rankings, which have direct clinical utility.
+
+\subsection{Support Vector Machines in Triage}
+SVMs have also been extensively studied for triage classification. Their kernel trick enables effective separation in high-dimensional spaces, making them well-suited for the 132-feature binary symptom space. However, SVMs require careful hyperparameter tuning and are computationally more demanding during inference compared to pre-trained Random Forest models loaded from disk via \texttt{joblib}. For production deployment scenarios requiring low-latency API responses, Random Forests are therefore preferred for this application.
+
+\section{Large Language Models in Healthcare}
+
+The emergence of Transformer-based Large Language Models (LLMs), initiated by the landmark ``Attention Is All You Need'' paper by Vaswani et al.\ (2017), has fundamentally reshaped the landscape of AI in healthcare. GPT-series models from OpenAI demonstrated that LLMs trained on general text corpora possess an implicit, emergent understanding of medical terminology, clinical reasoning patterns, and specialist domains.
+
+\subsection{LLMs for Clinical Text Processing}
+Subsequent research, including BioBERT (Lee et al., 2020) and ClinicalBERT (Alsentzer et al., 2019), demonstrated that fine-tuning on domain-specific biomedical corpora yields models with superior performance on clinical NLP benchmarks. For MedPredictX, the \texttt{llama-3.3-70b-versatile} model, served through the Groq API's LPU (Language Processing Unit) inference engine, provides extremely fast inference speeds---critical for a real-time clinical application.
+
+\subsection{PDF Medical Report Processing}
+The processing of clinical documents in PDF format presents a distinct technical challenge. While early systems relied on OCR to extract text from scanned documents, modern digital-native PDFs embed structured text data directly. Libraries such as \texttt{PyPDF2} (Python) enable reliable programmatic extraction of this embedded text, making it feasible to programmatically ``read'' a patient's lab report and pass the extracted clinical findings to an LLM for interpretation. MedPredictX employs this exact pipeline.
+
+\section{Telemedicine Platform Architectures}
+
+Contemporary telemedicine platforms, including Teladoc, Babylon Health, and similar services, have begun integrating AI-driven triage components. Babylon Health's symptom checker, for example, employs Bayesian inference networks trained on large clinical datasets. However, these systems are proprietary and inaccessible for research or educational purposes. MedPredictX contributes a transparent, open-architecture implementation that demonstrates the end-to-end integration of ML prediction and LLM recommendation within a single, deployable web application.
+
+\subsection{Role-Based Access Control in Healthcare Systems}
+A critical architectural requirement for any healthcare platform is strict role-based access control (RBAC). Studies on healthcare data breaches consistently identify unauthorized access as a primary vulnerability. JWT-based authentication, as implemented in MedPredictX via \texttt{djangorestframework-simplejwt}, provides a stateless, scalable, and cryptographically secure mechanism for enforcing role boundaries between Patients, Doctors, and Administrators.
+
+\section{Gap Analysis}
+
+Based on the reviewed literature, Table~\ref{tab:gap} summarizes the key gaps in existing systems and how MedPredictX addresses them.
+
+\begin{table}[htbp]
+\centering
+\caption{Gap analysis between existing systems and MedPredictX}
+\label{tab:gap}
+\begin{tabular}{|p{0.3\linewidth}|p{0.3\linewidth}|p{0.3\linewidth}|}
+\hline
+\textbf{Existing Limitation} & \textbf{Systems Affected} & \textbf{MedPredictX Solution} \\
+\hline
+No local ML inference (privacy risk) & Babylon, Teladoc & Local Random Forest on server \\
+\hline
+No PDF report parsing & Most telemedicine apps & PyPDF2 extraction pipeline \\
+\hline
+No geo-location for specialists & All reviewed systems & Dynamic Google Maps URI \\
+\hline
+Closed/proprietary architecture & Babylon, similar & Open Django/React stack \\
+\hline
+No unified Triage UI & General platforms & Single Triage Hub page \\
+\hline
+\end{tabular}
+\end{table}
